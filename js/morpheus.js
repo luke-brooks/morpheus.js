@@ -2320,185 +2320,31 @@ morpheus.Array2dReaderInteractive.prototype = {
   read: function (fileOrUrl, callback) {
     var _this = this;
     var name = morpheus.Util.getBaseFileName(morpheus.Util.getFileName(fileOrUrl));
-    var html = [];
-    html.push('<div>');
-    html.push('<label>Click the table cell containing the first data row and column.</label><br />');
-    // html.push('<div class="checkbox"> <label> <input name="transpose" type="checkbox">' +
-    //   ' Tranpose </label>' +
-    //   ' </div>');
-
-    html.push('<div' +
-      ' style="display:inline-block;width:10px;height:10px;background-color:#b3cde3;"></div><span> Data Matrix</span>');
-    html.push('<br /><div' +
-      ' style="display:inline-block;width:10px;height:10px;background-color:#fbb4ae;"></div><span> Column' +
-      ' Annotations</span>');
-    html.push('<br /><div' +
-      ' style="display:inline-block;' +
-      ' width:10px;height:10px;background-color:#ccebc5;"></div><span> Row' +
-      ' Annotations</span>');
-
-    html.push('<div class="slick-bordered-table" style="width:550px;height:300px;"></div>');
-    html.push('</div>');
-    var $el = $(html.join(''));
+    // this provides reader needed for skipping this entire fuction
     this._getReader(fileOrUrl, function (err, br) {
-      // show 1st 100 lines in table
-      if (err) {
-        console.log(err);
-        return callback(err);
-      }
-
-      var s;
-      var lines = [];
-      // show in table
-      var separator = /\t/;
-      var testLine = br.readLine();
-      var separators = ['\t', ',', ' '];
-      for (var i = 0; i < separators.length; i++) {
-        var sep = separators[i];
-        var tokens = testLine.split(new RegExp(sep));
-        if (tokens.length > 1) {
-          morpheus.Util.stripQuotes(tokens);
-          separator = sep;
-          lines.push(tokens);
-          break;
-        }
-      }
-
-      while ((s = br.readLine()) !== null && lines.length < 100) {
-        var tokens = s.split(separator);
-        morpheus.Util.stripQuotes(tokens);
-        lines.push(tokens);
-      }
-      if (lines[0][0] === '#1.3') {
-        br.reset();
-        callback(null, new morpheus.GctReader()._read(name, br));
-        return;
-      }
-      var grid;
-      var columns = [];
-      for (var j = 0, ncols = lines[0].length; j < ncols; j++) {
-        columns.push({
-          id: j,
-          field: j
-        });
-      }
-
-      var dataRowStart = 1;
+      br.reset();
+      // dataColumnStart = 1
+      // dataRowStart = 0
+      var separator = '\t';
       var dataColumnStart = 1;
-      var _lines = lines;
-      var grid = new Slick.Grid($el.find('.slick-bordered-table')[0], lines, columns, {
-        enableCellNavigation: true,
-        headerRowHeight: 0,
-        showHeaderRow: false,
-        multiColumnSort: false,
-        multiSelect: false,
-        topPanelHeight: 0,
-        enableColumnReorder: false,
-        enableTextSelectionOnCells: true,
-        forceFitColumns: false,
-        defaultFormatter: function (row, cell, value, columnDef, dataContext) {
-          var color = 'white';
-          if (cell >= dataColumnStart && row >= dataRowStart) {
-            color = '#b3cde3'; // data
-          } else if (row <= (dataRowStart - 1) && cell >= dataColumnStart) {
-            color = '#fbb4ae'; // column
-          } else if (cell < dataColumnStart && row >= dataRowStart) {
-            color = '#ccebc5'; // row
-          }
-          var html = ['<div style="width:100%;height:100%;background-color:' + color + '">'];
-          if (_.isNumber(value)) {
-            html.push(morpheus.Util.nf(value));
-          } else if (morpheus.Util.isArray(value)) {
-            var s = [];
-            for (var i = 0, length = value.length; i < length; i++) {
-              if (i > 0) {
-                s.push(', ');
-              }
-              s.push(value[i]);
-            }
-            html.push(s.join(''));
-          } else {
-            html.push(value);
-          }
-          html.push('</div>');
-          return html.join('');
-        }
-      });
-      var transposedLines;
-      var transposedColumns;
-      $el.find('[name=transpose]').on('click', function (e) {
-        if ($(this).prop('checked')) {
-          if (transposedLines == null) {
-            transposedLines = [];
-            for (var j = 0, ncols = lines[0].length; j < ncols; j++) {
-              var row = [];
-              transposedLines.push(row);
-              for (var i = 0, nrows = lines.length; i < nrows; i++) {
-                row.push(lines[i][j]);
-              }
-            }
-
-            transposedColumns = [];
-            for (var j = 0, ncols = transposedLines[0].length; j < ncols; j++) {
-              transposedColumns.push({
-                id: j,
-                field: j
-              });
-            }
-
-          }
-          lines = transposedLines;
-          grid.setData(transposedLines);
-          grid.setColumns(transposedColumns);
-          grid.resizeCanvas();
-          grid.invalidate();
-        } else {
-          grid.setData(_lines);
-          grid.setColumns(columns);
-          grid.resizeCanvas();
-          grid.invalidate();
-          lines = _lines;
-        }
-      });
-      grid.onClick.subscribe(function (e, args) {
-        dataRowStart = args.row;
-        dataColumnStart = args.cell;
-        grid.invalidate();
-      });
-
-      $el.find('.slick-header').remove();
-      var footer = [];
-      footer
-        .push('<button name="ok" type="button" class="btn btn-default">OK</button>');
-      footer
-        .push('<button name="cancel" type="button" data-dismiss="modal" class="btn btn-default">Cancel</button>');
-      var $footer = $(footer.join(''));
-
-      morpheus.FormBuilder.showOkCancel({
-        title: 'Open',
-        content: $el,
-        close: false,
-        focus: document.activeElement,
-        cancelCallback: function () {
-          callback(new Error('Cancel'), null);
-        },
-        okCallback: function () {
-          br.reset();
-          _this._read(name, br, dataColumnStart, dataRowStart, separator, callback);
-        }
-      });
-      grid.resizeCanvas();
-
+      var dataRowStart = 0;
+      console.log('LTB: data transpose', [name, br, dataColumnStart, dataRowStart, separator, callback]);
+      _this._read(name, br, dataColumnStart, dataRowStart, separator, callback);
+      return;
     });
 
   },
   _read: function (datasetName, bufferedReader, dataColumnStart, dataRowStart, separator, cb) {
+    // hi mom 10
+    // this actually parses the data from the file
+    // need to obtain buffered Reader
     var dataset = new morpheus.TxtReader({
       separator: separator,
       columnMetadata: true,
       dataRowStart: dataRowStart,
       dataColumnStart: dataColumnStart
     })._read(datasetName, bufferedReader);
+    console.log('LTB: processed txt data', dataset);
     cb(null, dataset);
   }
 };
@@ -4597,6 +4443,7 @@ morpheus.TcgaUtil.getDataset = function (options) {
 
     promises.push(new Promise(function (resolve, reject) {
       new morpheus.TxtReader().read(options.mrna, function (err, dataset) {
+        console.log('LTB: getDataset in TcgaUtil');
         if (err) {
           console.log('Error reading file:' + err);
         } else {
@@ -4613,6 +4460,7 @@ morpheus.TcgaUtil.getDataset = function (options) {
 
     promises.push(new Promise(function (resolve, reject) {
       new morpheus.MafFileReader().read(options.mutation, function (err, dataset) {
+        console.log('LTB: maffilereader in TcgaUtil');
         if (err) {
           console.log('Error reading file:' + err);
         } else {
@@ -4633,6 +4481,7 @@ morpheus.TcgaUtil.getDataset = function (options) {
     promises.push(new Promise(function (resolve, reject) {
       new morpheus.GisticReader().read(options.gistic,
         function (err, dataset) {
+          console.log('LTB: gisticreader in TcgaUtil');
           if (err) {
             console.log('Error reading file:' + err);
           } else {
@@ -4651,6 +4500,7 @@ morpheus.TcgaUtil.getDataset = function (options) {
         dataColumnStart: 3
 
       }).read(options.gisticGene, function (err, dataset) {
+        console.log('LTB: getDataset 4 in TcgaUtil');
         if (err) {
           console.log('Error reading file:' + err);
         } else {
@@ -4666,6 +4516,7 @@ morpheus.TcgaUtil.getDataset = function (options) {
   if (options.seg) {
     promises.push(new Promise(function (resolve, reject) {
       new morpheus.SegTabReader().read(options.seg, function (err, dataset) {
+        console.log('LTB: getDataset 3 in TcgaUtil');
         if (err) {
           console.log('Error reading file:' + err);
         } else {
@@ -4681,6 +4532,7 @@ morpheus.TcgaUtil.getDataset = function (options) {
     // id + type
     promises.push(new Promise(function (resolve, reject) {
       new morpheus.TxtReader({dataColumnStart: 2}).read(options.rppa, function (err, dataset) {
+        console.log('LTB: getDataset 2 in TcgaUtil');
         if (err) {
           console.log('Error reading file:' + err);
         } else {
@@ -6255,6 +6107,7 @@ morpheus.DatasetUtil.readDatasetArray = function (urls) {
     var p = morpheus.DatasetUtil.read(url);
     promises.push(p);
     p.then(function (dataset) {
+      console.log('LTB: readDatasetArray', urls, dataset);
       loadedDatasets[i] = dataset;
     }).catch(function (err) {
       var message = [
@@ -6332,6 +6185,48 @@ morpheus.DatasetUtil.annotate = function (options) {
     return functions;
   });
 };
+morpheus.myAutomate = function (file) {
+  console.log('LTB: automate test', file);
+  // handle single input file
+  // parse file with:
+  morpheus.DatasetUtil.read(file, null, true).then(() => {
+    console.log('LTB: auto test success');
+  });
+
+  // need to initialize my own heatmap
+
+  // apply color scheme
+  // var json = JSON.parse($.trim(text));
+  var json = {
+    "valueToColorScheme": {
+        "null": {
+            "fractions": [
+                0,
+                0.3333333333333333,
+                0.6666666666666666,
+                1
+            ],
+            "colors": [
+                "#3fd534",
+                "#f70202",
+                "#036ffc",
+                "#eeff00"
+            ],
+            "min": 1,
+            "max": 4,
+            "missingColor": "#c0c0c0",
+            "scalingMode": 1,
+            "stepped": false
+        }
+      }
+  };
+  // heatMap.heatmap.getColorScheme().fromJSON(json);
+  // colorSchemeChooser
+  //   .setColorScheme(heatMap.heatmap
+  //     .getColorScheme());
+  // heatMap.heatmap.setInvalid(true);
+  // heatMap.heatmap.repaint();
+}
 /**
  * Reads a dataset at the specified URL or file
  * @param fileOrUrl
@@ -6341,7 +6236,9 @@ morpheus.DatasetUtil.annotate = function (options) {
  * @params options.extension
  * @return A promise that resolves to morpheus.DatasetInterface
  */
-morpheus.DatasetUtil.read = function (fileOrUrl, options) {
+morpheus.DatasetUtil.read = function (fileOrUrl, options, test = false) {
+  console.log('LTB: dataset util read params', fileOrUrl, options);
+  console.log('LTB: dataset util read test', test);
   return new Promise(function (resolve, reject) {
     if (fileOrUrl == null) {
       reject('File is null');
@@ -6349,72 +6246,27 @@ morpheus.DatasetUtil.read = function (fileOrUrl, options) {
     if (options == null) {
       options = {};
     }
-    var isFile = morpheus.Util.isFile(fileOrUrl);
-    var isString = morpheus.Util.isString(fileOrUrl);
-    var ext = options.extension ? options.extension : morpheus.Util.getExtension(morpheus.Util.getFileName(fileOrUrl));
-    var datasetReader;
-    var str = fileOrUrl.toString();
-    if ((ext === '' && str != null && str.indexOf('blob:') === 0) || options.clipboard) {
-      // can be txt or gct
-      datasetReader = options.interactive ? new morpheus.Array2dReaderInteractive() : new morpheus.TxtReader(); // copy from clipboard
-    } else {
-      datasetReader = morpheus.DatasetUtil.getDatasetReader(ext, options);
-      if (datasetReader == null) {
-        datasetReader = isFile ? (options.interactive ? new morpheus.Array2dReaderInteractive() : new morpheus.TxtReader()) : new morpheus.GctReader();
-      }
-    }
-    if (isString || isFile) { // URL or file
-      if (options.background) {
-        var path = morpheus.Util.getScriptPath();
-        var blob = new Blob(
-          [
-            'self.onmessage = function(e) {'
-            + 'importScripts(e.data.path);'
-            + 'var ext = morpheus.Util.getExtension(morpheus.Util'
-            + '.getFileName(e.data.fileOrUrl));'
-            + 'var datasetReader = morpheus.DatasetUtil.getDatasetReader(ext,'
-            + '	e.data.options);'
-            + 'datasetReader.read(e.data.fileOrUrl, function(err,dataset) {'
-            + '	self.postMessage(dataset);' + '	});' + '}']);
-
-        var blobURL = window.URL.createObjectURL(blob);
-        var worker = new Worker(blobURL);
-        worker.addEventListener('message', function (e) {
-          resolve(morpheus.Dataset.fromJSON(e.data));
-          window.URL.revokeObjectURL(blobURL);
-        }, false);
-        // start the worker
-        worker.postMessage({
-          path: path,
-          fileOrUrl: fileOrUrl,
-          options: options
-        });
-
+    var datasetReader = new morpheus.Array2dReaderInteractive();
+    
+    // hi mom this is end game bro
+    datasetReader.read(fileOrUrl, function (err, dataset) {
+      console.log('LTB: datasetReader in DatasetUtil');
+      console.log('LTB: this is the way ;)');
+      if (err) {
+        reject(err);
       } else {
-        datasetReader.read(fileOrUrl, function (err, dataset) {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(dataset);
-          }
-        });
+        resolve(dataset);
       }
+    });
 
-      // override toString so can determine file name
-      // this.toString = function () {
-      //   return '' + fileOrUrl;
-      // };
-    } else if (typeof fileOrUrl.then === 'function') { // assume it's a promise
-      return resolve(fileOrUrl);
-    } else { // it's already a dataset?
-      if (fileOrUrl.getRowCount) { // it's a dataset
-        resolve(fileOrUrl);
-      } else { // JSON
-        resolve(morpheus.Dataset.fromJSON(fileOrUrl));
-      }
-    }
+    // var json = JSON.parse($.trim(text));
+    // heatMap.heatmap.getColorScheme().fromJSON(json);
+    // colorSchemeChooser
+    //   .setColorScheme(heatMap.heatmap
+    //     .getColorScheme());
+    // heatMap.heatmap.setInvalid(true);
+    // heatMap.heatmap.repaint();
   });
-
 };
 
 /**
@@ -12311,6 +12163,7 @@ morpheus.Util.extend(morpheus.Vector, morpheus.AbstractVector);
  * @constructor
  */
 morpheus.LandingPage = function (pageOptions) {
+  console.log('LTB: babys second landing page', pageOptions);
   pageOptions = $.extend({}, {
     el: $('#vis')
   }, pageOptions);
@@ -12485,7 +12338,8 @@ morpheus.LandingPage.showHeatMap = function (id) {
 };
 morpheus.LandingPage.prototype = {
 
-  open: function (openOptions) {
+  open: function (openOptions) { // this actually refers to the landing page for the heat map
+    console.log('LTB: landing page open', openOptions);
     this.dispose();
     var optionsArray = _.isArray(openOptions) ? openOptions : [openOptions];
     var _this = this;
@@ -12495,7 +12349,7 @@ morpheus.LandingPage.prototype = {
       options.focus = i === 0;
       options.standalone = true;
       options.landingPage = _this;
-      new morpheus.HeatMap(options);
+      new morpheus.HeatMap(options, true);
     }
 
   },
@@ -12513,11 +12367,13 @@ morpheus.LandingPage.prototype = {
       });
     }
   },
+  // may need to inject file here
   openFile: function (files) {
     if (files.length !== 3) {
       var _this = this;
       var file = files[0];
       var fileName = morpheus.Util.getFileName(file);
+      // only look at .txt
       if (fileName.toLowerCase().indexOf('.json') === fileName.length - 5) {
         morpheus.Util.getText(file).then(function (text) {
           _this.open(JSON.parse(text));
@@ -12535,12 +12391,15 @@ morpheus.LandingPage.prototype = {
           }
         };
 
+        console.log('LTB: prepping to parse data');
         morpheus.OpenDatasetTool.fileExtensionPrompt(fileName, function (readOptions) {
+          // hi mom 7
           if (readOptions) {
             for (var key in readOptions) {
               options.dataset.options[key] = readOptions[key];
             }
           }
+          console.log('LTB: file ext read options', readOptions);
           _this.open(options);
         });
       }
@@ -16261,6 +16120,7 @@ morpheus.OpenDatasetTool.prototype = {
             var deferred = morpheus.DatasetUtil.read(file,
               readOptions);
             deferred.finally(function () {
+              console.log('LTB: execute func of something', _this);
               resolve();
             });
             _this._read(options, deferred);
@@ -21790,6 +21650,7 @@ morpheus.DualList.prototype = {
  * @constructor
  */
 morpheus.FilePicker = function (options) {
+  console.log('LTB: plz werk');
   var html = [];
   html.push('<div>');
   var myComputer = _.uniqueId('morpheus');
@@ -21886,6 +21747,7 @@ morpheus.FilePicker = function (options) {
   this.$el = $el;
 
   var $file = $el.find('[name=hiddenFile]');
+  console.log('LTB: uploaded file bro', $file);
   var $myComputer = $el.find('[id=' + myComputer + ']');
   this.$el.find('.nav').on('click', 'li > a', function (e) {
     e.preventDefault();
@@ -26667,6 +26529,7 @@ morpheus.HeatMapOptions = function (heatMap) {
   });
   colorSchemeFormBuilder.find('load_color_scheme').on('click',
     function (e) {
+      console.log('LTB: load dat ish');
       var val = colorSchemeFormBuilder.getValue('saved_color_scheme');
       var repaint = true;
       if (val === 'relative') {
@@ -26699,9 +26562,11 @@ morpheus.HeatMapOptions = function (heatMap) {
         $file.appendTo(heatMap.getContentEl());
         $file.click();
         $file.on('change', function (evt) {
+          console.log('LTB: color scheme file', evt);
           var files = evt.target.files;
           morpheus.Util.getText(evt.target.files[0]).then(
             function (text) {
+              console.log('LTB: scheme text', text);
               var json = JSON.parse($.trim(text));
               heatMap.heatmap.getColorScheme().fromJSON(json);
               colorSchemeChooser
@@ -27124,9 +26989,10 @@ morpheus.HeatMapToolBar = function (heatMap) {
   toolbarHtml.push('<div class="morpheus-button-divider"></div>');
 
   if (heatMap.options.toolbar.indexOf('Options') !== -1) {
+    // need to find events attached to this tag
     toolbarHtml.push(
       '<button data-action="Options" data-toggle="tooltip" title="Options" type="button"' +
-      ' class="btn btn-default btn-xxs"><span class="fa fa-cog"></span></button>');
+      ' class="btn btn-default btn-xxs hi-mom"><span class="fa fa-cog"></span></button>');
 
   }
 
@@ -27160,6 +27026,7 @@ morpheus.HeatMapToolBar = function (heatMap) {
   var $toolbar = $(toolbarHtml.join(''));
 
   $toolbar.find('[data-action]').on('click', function (e) {
+    console.log('LTB: muh triggers', this);
     e.preventDefault();
     heatMap.getActionManager().execute($(this).data('action'));
   }).on('blur', function (e) {
@@ -28793,7 +28660,11 @@ morpheus.Util.extend(morpheus.HeatMapTrackShapeLegend, morpheus.AbstractCanvas);
  *
  */
 
-morpheus.HeatMap = function (options) {
+morpheus.HeatMap = function (options, test = false) {
+  var _myOpts = options;
+  console.log('LTB: starting heatmap obj', test);
+  console.log('LTB: starting heatmap obj options', _myOpts);
+  // hi mom 3
   morpheus.Util.loadTrackingCode();
   var _this = this;
   // don't extend
@@ -29143,6 +29014,7 @@ morpheus.HeatMap = function (options) {
         okCallback: function () {
           var file = datasetFormBuilder.getValue('file');
           morpheus.DatasetUtil.read(file).then(function (dataset) {
+            console.log('LTB: dataset on heatmap cofig form');
             resolve(dataset);
           }).catch(function (err) {
             reject(err);
@@ -29169,6 +29041,7 @@ morpheus.HeatMap = function (options) {
           new morpheus.TabManager({
             landingPage: function () {
               if (_this.options.landingPage == null) {
+                console.log('LTB: babys first landing page');
                 _this.options.landingPage = new morpheus.LandingPage({tabManager: _this.tabManager});
                 _this.options.landingPage.$el.prependTo(_this.$el);
               }
@@ -29322,117 +29195,47 @@ morpheus.HeatMap = function (options) {
     }
     _this.$el.trigger('heatMapLoaded', _this);
   };
-  if (morpheus.Util.isArray(options.dataset)) {
-    var d = morpheus.DatasetUtil.readDatasetArray(options.dataset);
-    d.catch(function (message) {
-      if (_this.options.$loadingImage) {
-        _this.options.$loadingImage.remove();
-      }
-      if (_this.options.error) {
-        _this.options.error(message);
-      }
-      morpheus.FormBuilder.showInModal({
-        title: 'Error',
-        html: message,
-        appendTo: _this.getContentEl(),
-        focus: _this.getFocusEl()
-      });
-    }).then(function (joined) {
-      if (_this.options.$loadingImage) {
-        _this.options.$loadingImage.remove();
-      }
 
-      _this.options.dataset = joined;
-      _this._init();
-      if (joined.getRowMetadata().getByName('Source') != null
-        && !_this.options.colorScheme) {
-        _this.heatmap.getColorScheme().setSeparateColorSchemeForRowMetadataField(
-          'Source');
-      }
+  var dsPromise = options.dataset.file ? morpheus.DatasetUtil.read(
+    options.dataset.file, options.dataset.options)
+    : morpheus.DatasetUtil.read(options.dataset);
+  dsPromise.then(function (dataset) {
+    console.log('LTB: dataset overlay promise 1 heatmap load');
+    _this.options.dataset = dataset;
+  }).catch(function (err) {
+    _this.options.$loadingImage.remove();
+    var message = [
+      'Error opening '
+      + (options.dataset.file ? morpheus.Util.getFileName(options.dataset.file) : morpheus.Util.getFileName(options.dataset)) + '.'];
 
-      _.each(
-        options.dataset,
-        function (option) {
-          if (option.colorScheme) {
-            _this.heatmap.getColorScheme().setCurrentValue(
-              morpheus.Util.getBaseFileName(morpheus.Util.getFileName(option.dataset)));
-            _this.heatmap.getColorScheme().setColorSupplierForCurrentValue(
-              morpheus.AbstractColorSupplier.fromJSON(option.colorScheme));
+    if (err.message) {
+      message.push('<br />Cause: ');
+      message.push(err.message);
 
-          } else {
-            try {
-              _this.autoDisplay({
-                extension: morpheus.Util.getExtension(morpheus.Util.getFileName(option.dataset)),
-                filename: morpheus.Util.getBaseFileName(morpheus.Util.getFileName(option.dataset))
-              });
-            } catch (x) {
-              console.log('Autodisplay errror');
-            }
-
-          }
-        });
-
-      heatMapLoaded();
-    });
-  } else {
-    var dsPromise = options.dataset.file ? morpheus.DatasetUtil.read(
-      options.dataset.file, options.dataset.options)
-      : morpheus.DatasetUtil.read(options.dataset);
-    dsPromise.then(function (dataset) {
-      _this.options.dataset = dataset;
-    }).catch(function (err) {
-      _this.options.$loadingImage.remove();
-      var message = [
-        'Error opening '
-        + (options.dataset.file ? morpheus.Util.getFileName(options.dataset.file) : morpheus.Util.getFileName(options.dataset)) + '.'];
-
-      if (err.message) {
-        message.push('<br />Cause: ');
-        message.push(err.message);
-
-      }
-      if (_this.options.error) {
-        _this.options.error(message);
-      }
-      morpheus.FormBuilder.showInModal({
-        title: 'Error',
-        html: message.join(''),
-        appendTo: _this.getContentEl(),
-        focus: _this.getFocusEl()
-      });
-    });
-    promises.push(dsPromise);
-    var datasetOverlay = null;
-    if (options.datasetOverlay) {
-      var d = options.datasetOverlay.file ? morpheus.DatasetUtil.read(
-        options.datasetOverlay.file, options.datasetOverlay.options)
-        : morpheus.DatasetUtil.read(options.datasetOverlay);
-      d.then(function (dataset) {
-        datasetOverlay = dataset;
-      });
-      promises.push(d);
     }
-    Promise.all(promises).then(function () {
-      if (_this.options.$loadingImage) {
-        _this.options.$loadingImage.remove();
-      }
-      if (_this.options.dataset == null) {
-        return _this.tabManager.remove(_this.tabId);
-      }
-      _this._init();
-      if (datasetOverlay) {
-        morpheus.DatasetUtil.overlay({
-          dataset: _this.options.dataset,
-          newDataset: datasetOverlay,
-          rowAnnotationName: 'id',
-          newRowAnnotationName: 'id',
-          columnAnnotationName: 'id',
-          newColumnAnnotationName: 'id'
-        });
-      }
-      heatMapLoaded();
+    if (_this.options.error) {
+      _this.options.error(message);
+    }
+    morpheus.FormBuilder.showInModal({
+      title: 'Error',
+      html: message.join(''),
+      appendTo: _this.getContentEl(),
+      focus: _this.getFocusEl()
     });
-  }
+  });
+  promises.push(dsPromise);
+  
+  Promise.all(promises).then(function () {
+    if (_this.options.$loadingImage) {
+      _this.options.$loadingImage.remove();
+    }
+    if (_this.options.dataset == null) {
+      return _this.tabManager.remove(_this.tabId);
+    }
+    console.log('LTB: runing heatmap init');
+    _this._init();
+    heatMapLoaded();
+  });
 };
 
 morpheus.HeatMap.SPACE_BETWEEN_HEAT_MAP_AND_ANNOTATIONS = 6;
@@ -29849,6 +29652,8 @@ morpheus.HeatMap.prototype = {
     return this.options.name;
   },
   showOptions: function () {
+    // hi mom 4 may need this
+    console.log('LTB: show heat map options');
     new morpheus.HeatMapOptions(this);
   },
   getProject: function () {

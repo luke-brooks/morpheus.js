@@ -4,6 +4,7 @@ var https = require('https');
 var serveStatic = require('serve-static')
 var serve = serveStatic('.', {
   'index': ['index.html', 'index.htm'],
+  // 'index': ['./examples/json_example.html', './examples/json_example.htm'],
   'setHeaders': function (res, path) {
     res.setHeader('Access-Control-Allow-Origin', '*');
   }
